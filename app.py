@@ -1,10 +1,12 @@
 """
 Human Body Factoid Generator - Streamlit App
+Powered by Google Gemini (Free API)
 """
 
 import streamlit as st
-import anthropic
+import google.generativeai as genai
 import random
+import json
 
 # Page config
 st.set_page_config(
@@ -41,33 +43,30 @@ st.markdown("""
 
 # Header
 st.markdown('<div class="title-text">🧬 Human Body Factoid Generator</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">Discover fascinating facts about the human body powered by Claude AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">Discover fascinating facts about the human body — powered by Google Gemini AI</div>', unsafe_allow_html=True)
 st.divider()
 
 # Suggested body parts
 BODY_PARTS = [
     "Heart", "Brain", "Liver", "Lungs", "Kidney",
     "Skin", "Eyes", "Bones", "Stomach", "Blood",
-    "Muscles", "DNA", "Teeth", "Ears", "Nose"
 ]
 
 # Input section
 col1, col2 = st.columns([2, 1])
-
 with col1:
     body_part = st.text_input(
         "🔍 Enter a body part",
         placeholder="e.g. heart, brain, liver...",
         label_visibility="collapsed"
     )
-
 with col2:
     num_facts = st.selectbox("Number of facts", [1, 2, 3, 4, 5], index=0)
 
 # Quick select buttons
 st.markdown("**Quick select:**")
 cols = st.columns(5)
-for i, part in enumerate(BODY_PARTS[:10]):
+for i, part in enumerate(BODY_PARTS):
     if cols[i % 5].button(part, use_container_width=True):
         body_part = part
 
@@ -76,7 +75,6 @@ st.divider()
 # Generate button
 generate = st.button("✨ Generate Factoids", type="primary", use_container_width=True)
 
-# Generation logic
 if generate:
     if not body_part.strip():
         st.warning("⚠️ Please enter or select a body part first!")
@@ -86,38 +84,32 @@ if generate:
             "related to evolutionary biology",
             "about world records or extremes",
             "about medical or scientific discoveries",
-            "about how the body part functions at the cellular level",
+            "about cellular level functions",
             "about historical or cultural significance",
-            "about how it compares to other animals",
+            "comparing to other animals",
             "about common myths or misconceptions",
         ]
         selected_styles = random.sample(styles, min(num_facts, len(styles)))
 
         with st.spinner(f"Generating {num_facts} factoid(s) about the **{body_part}**..."):
             try:
-                api_key = st.secrets["ANTHROPIC_API_KEY"]
-                client = anthropic.Anthropic(api_key=api_key)
+                api_key = st.secrets["GEMINI_API_KEY"]
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel("gemini-1.5-flash")
 
                 prompt = f"""Generate {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
 
 Each factoid should be:
-- A different style from this list (use one per factoid): {', '.join(selected_styles)}
+- Style to use (one per factoid): {', '.join(selected_styles)}
 - Concise (1-3 sentences)
 - Scientifically accurate
 - Engaging and surprising
 
-Format as a JSON array of strings, each string being one factoid.
-Return ONLY the JSON array, no other text."""
+Return ONLY a JSON array of strings, one string per factoid. No markdown, no extra text. Example:
+["Fact one here.", "Fact two here."]"""
 
-                message = client.messages.create(
-                    model="claude-opus-4-5",
-                    max_tokens=1024,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-
-                import json
-                response_text = message.content[0].text.strip()
-                # Clean up markdown fences if present
+                response = model.generate_content(prompt)
+                response_text = response.text.strip()
                 response_text = response_text.replace("```json", "").replace("```", "").strip()
                 factoids = json.loads(response_text)
 
@@ -130,4 +122,4 @@ Return ONLY the JSON array, no other text."""
 
 # Footer
 st.divider()
-st.markdown("<center><small>Powered by Claude AI · Built with Streamlit</small></center>", unsafe_allow_html=True)
+st.markdown("<center><small>Powered by Google Gemini · Built with Streamlit</small></center>", unsafe_allow_html=True)
