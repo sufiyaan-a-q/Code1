@@ -47,14 +47,14 @@ st.markdown('<div class="title-text">🧬 Human Body Factoid Generator</div>', u
 st.markdown('<div class="subtitle-text">Discover fascinating facts about the human body — powered by Groq AI</div>', unsafe_allow_html=True)
 st.divider()
 
-# Suggested body parts
 BODY_PARTS = [
+    "-- Type or select a body part --",
     "Heart", "Brain", "Liver", "Lungs", "Kidney",
     "Skin", "Eyes", "Bones", "Stomach", "Blood",
+    "Spine", "Teeth", "Ears", "Nose", "Tongue",
 ]
 
 def parse_factoids(text, num_facts):
-    """Robustly parse factoids from LLM response."""
     text = re.sub(r"```json|```", "", text).strip()
     text = re.sub(r",\s*([\]}])", r"\1", text)
     try:
@@ -69,40 +69,28 @@ def parse_factoids(text, num_facts):
     lines = [l.strip("-•123456789. ").strip() for l in text.splitlines() if l.strip()]
     return [l for l in lines if len(l) > 20][:num_facts]
 
-# Initialize session state for body part
-if "body_part" not in st.session_state:
-    st.session_state.body_part = ""
-
-# Quick select buttons — ABOVE the text input so clicks populate it
-st.markdown("**Quick select:**")
-cols = st.columns(5)
-for i, part in enumerate(BODY_PARTS):
-    if cols[i % 5].button(part, use_container_width=True):
-        st.session_state.body_part = part
-
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
-    body_part = st.text_input(
-        "🔍 Enter a body part",
-        placeholder="e.g. heart, brain, liver...",
-        value=st.session_state.body_part,
-        key="body_part_input"
-    )
-    # Sync manual typing back to session state
-    st.session_state.body_part = body_part
+    selected = st.selectbox("Select a body part", BODY_PARTS)
+    custom = st.text_input("Or type a custom body part", placeholder="e.g. appendix, cornea...")
 
 with col2:
     num_facts = st.selectbox("Number of facts", [1, 2, 3, 4, 5], index=0)
 
+# Determine which body part to use
+body_part = custom.strip() if custom.strip() else (selected if selected != BODY_PARTS[0] else "")
+
+if body_part:
+    st.info(f"Selected: **{body_part}**")
+
 st.divider()
 
-# Generate button
 generate = st.button("✨ Generate Factoids", type="primary", use_container_width=True)
 
 if generate:
-    if not st.session_state.body_part.strip():
-        st.warning("⚠️ Please enter or select a body part first!")
+    if not body_part:
+        st.warning("⚠️ Please select or type a body part first!")
     else:
         styles = [
             "surprising and counterintuitive",
@@ -116,11 +104,11 @@ if generate:
         ]
         selected_styles = random.sample(styles, min(num_facts, len(styles)))
 
-        with st.spinner(f"Generating {num_facts} factoid(s) about the **{st.session_state.body_part}**..."):
+        with st.spinner(f"Generating {num_facts} factoid(s) about the **{body_part}**..."):
             try:
                 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-                prompt = f"""Generate exactly {num_facts} fascinating and accurate factoid(s) about the human {st.session_state.body_part}.
+                prompt = f"""Generate exactly {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
 
 Each factoid should be:
 - Style (one per factoid): {', '.join(selected_styles)}
@@ -145,13 +133,12 @@ Do not add anything before or after the JSON array."""
                 if not factoids:
                     st.error("Could not parse response. Please try again.")
                 else:
-                    st.success(f"🧬 Here are your factoids about the **{st.session_state.body_part.title()}**!")
+                    st.success(f"🧬 Here are your factoids about the **{body_part.title()}**!")
                     for i, fact in enumerate(factoids, 1):
                         st.markdown(f'<div class="factoid-box">💡 <b>Fact #{i}:</b> {fact}</div>', unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
 
-# Footer
 st.divider()
 st.markdown("<center><small>Powered by Groq AI · Built with Streamlit</small></center>", unsafe_allow_html=True)
