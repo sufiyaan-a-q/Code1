@@ -107,7 +107,7 @@ Return ONLY a JSON array of strings, one string per factoid. No markdown, no ext
 ["Fact one here.", "Fact two here."]"""
 
                 response = client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.3-70b-versatile",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.8,
                 )
