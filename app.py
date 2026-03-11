@@ -1,10 +1,10 @@
 """
 Human Body Factoid Generator - Streamlit App
-Powered by Google Gemini (Free API)
+Powered by Groq (Free API)
 """
 
 import streamlit as st
-import google.generativeai as genai
+from groq import Groq
 import random
 import json
 
@@ -43,7 +43,7 @@ st.markdown("""
 
 # Header
 st.markdown('<div class="title-text">🧬 Human Body Factoid Generator</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">Discover fascinating facts about the human body — powered by Google Gemini AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">Discover fascinating facts about the human body — powered by Groq AI</div>', unsafe_allow_html=True)
 st.divider()
 
 # Suggested body parts
@@ -93,9 +93,7 @@ if generate:
 
         with st.spinner(f"Generating {num_facts} factoid(s) about the **{body_part}**..."):
             try:
-                api_key = st.secrets["GEMINI_API_KEY"]
-                genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-2.0-flash")
+                client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
                 prompt = f"""Generate {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
 
@@ -108,8 +106,13 @@ Each factoid should be:
 Return ONLY a JSON array of strings, one string per factoid. No markdown, no extra text. Example:
 ["Fact one here.", "Fact two here."]"""
 
-                response = model.generate_content(prompt)
-                response_text = response.text.strip()
+                response = client.chat.completions.create(
+                    model="llama3-8b-8192",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.8,
+                )
+
+                response_text = response.choices[0].message.content.strip()
                 response_text = response_text.replace("```json", "").replace("```", "").strip()
                 factoids = json.loads(response_text)
 
@@ -122,4 +125,4 @@ Return ONLY a JSON array of strings, one string per factoid. No markdown, no ext
 
 # Footer
 st.divider()
-st.markdown("<center><small>Powered by Google Gemini · Built with Streamlit</small></center>", unsafe_allow_html=True)
+st.markdown("<center><small>Powered by Groq AI · Built with Streamlit</small></center>", unsafe_allow_html=True)
