@@ -95,7 +95,7 @@ if generate:
             try:
                 api_key = st.secrets["GEMINI_API_KEY"]
                 genai.configure(api_key=api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.0-flash")
 
                 prompt = f"""Generate {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
 
