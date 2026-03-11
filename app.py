@@ -7,6 +7,7 @@ import streamlit as st
 from groq import Groq
 import random
 import json
+import re
 
 # Page config
 st.set_page_config(
@@ -52,6 +53,27 @@ BODY_PARTS = [
     "Skin", "Eyes", "Bones", "Stomach", "Blood",
 ]
 
+def parse_factoids(text, num_facts):
+    """Robustly parse factoids from LLM response."""
+    # Clean markdown fences
+    text = re.sub(r"```json|```", "", text).strip()
+    # Remove trailing commas before ] or }
+    text = re.sub(r",\s*([\]}])", r"\1", text)
+    # Try JSON parse first
+    try:
+        result = json.loads(text)
+        if isinstance(result, list):
+            return [str(f) for f in result]
+    except Exception:
+        pass
+    # Fallback: extract quoted strings
+    matches = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
+    if matches:
+        return matches[:num_facts]
+    # Last resort: split by newlines
+    lines = [l.strip("-•123456789. ").strip() for l in text.splitlines() if l.strip()]
+    return [l for l in lines if len(l) > 20][:num_facts]
+
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
@@ -95,16 +117,18 @@ if generate:
             try:
                 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-                prompt = f"""Generate {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
+                prompt = f"""Generate exactly {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
 
 Each factoid should be:
-- Style to use (one per factoid): {', '.join(selected_styles)}
+- Style (one per factoid): {', '.join(selected_styles)}
 - Concise (1-3 sentences)
 - Scientifically accurate
 - Engaging and surprising
 
-Return ONLY a JSON array of strings, one string per factoid. No markdown, no extra text. Example:
-["Fact one here.", "Fact two here."]"""
+Return ONLY a valid JSON array of strings with NO trailing commas. Example:
+["Fact one here.", "Fact two here."]
+
+Do not add anything before or after the JSON array."""
 
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
@@ -113,12 +137,14 @@ Return ONLY a JSON array of strings, one string per factoid. No markdown, no ext
                 )
 
                 response_text = response.choices[0].message.content.strip()
-                response_text = response_text.replace("```json", "").replace("```", "").strip()
-                factoids = json.loads(response_text)
+                factoids = parse_factoids(response_text, num_facts)
 
-                st.success(f"🧬 Here are your factoids about the **{body_part.title()}**!")
-                for i, fact in enumerate(factoids, 1):
-                    st.markdown(f'<div class="factoid-box">💡 <b>Fact #{i}:</b> {fact}</div>', unsafe_allow_html=True)
+                if not factoids:
+                    st.error("Could not parse response. Please try again.")
+                else:
+                    st.success(f"🧬 Here are your factoids about the **{body_part.title()}**!")
+                    for i, fact in enumerate(factoids, 1):
+                        st.markdown(f'<div class="factoid-box">💡 <b>Fact #{i}:</b> {fact}</div>', unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
