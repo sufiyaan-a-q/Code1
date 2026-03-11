@@ -55,24 +55,30 @@ BODY_PARTS = [
 
 def parse_factoids(text, num_facts):
     """Robustly parse factoids from LLM response."""
-    # Clean markdown fences
     text = re.sub(r"```json|```", "", text).strip()
-    # Remove trailing commas before ] or }
     text = re.sub(r",\s*([\]}])", r"\1", text)
-    # Try JSON parse first
     try:
         result = json.loads(text)
         if isinstance(result, list):
             return [str(f) for f in result]
     except Exception:
         pass
-    # Fallback: extract quoted strings
     matches = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
     if matches:
         return matches[:num_facts]
-    # Last resort: split by newlines
     lines = [l.strip("-•123456789. ").strip() for l in text.splitlines() if l.strip()]
     return [l for l in lines if len(l) > 20][:num_facts]
+
+# Initialize session state for body part
+if "body_part" not in st.session_state:
+    st.session_state.body_part = ""
+
+# Quick select buttons — ABOVE the text input so clicks populate it
+st.markdown("**Quick select:**")
+cols = st.columns(5)
+for i, part in enumerate(BODY_PARTS):
+    if cols[i % 5].button(part, use_container_width=True):
+        st.session_state.body_part = part
 
 # Input section
 col1, col2 = st.columns([2, 1])
@@ -80,17 +86,14 @@ with col1:
     body_part = st.text_input(
         "🔍 Enter a body part",
         placeholder="e.g. heart, brain, liver...",
-        label_visibility="collapsed"
+        value=st.session_state.body_part,
+        key="body_part_input"
     )
+    # Sync manual typing back to session state
+    st.session_state.body_part = body_part
+
 with col2:
     num_facts = st.selectbox("Number of facts", [1, 2, 3, 4, 5], index=0)
-
-# Quick select buttons
-st.markdown("**Quick select:**")
-cols = st.columns(5)
-for i, part in enumerate(BODY_PARTS):
-    if cols[i % 5].button(part, use_container_width=True):
-        body_part = part
 
 st.divider()
 
@@ -98,7 +101,7 @@ st.divider()
 generate = st.button("✨ Generate Factoids", type="primary", use_container_width=True)
 
 if generate:
-    if not body_part.strip():
+    if not st.session_state.body_part.strip():
         st.warning("⚠️ Please enter or select a body part first!")
     else:
         styles = [
@@ -113,11 +116,11 @@ if generate:
         ]
         selected_styles = random.sample(styles, min(num_facts, len(styles)))
 
-        with st.spinner(f"Generating {num_facts} factoid(s) about the **{body_part}**..."):
+        with st.spinner(f"Generating {num_facts} factoid(s) about the **{st.session_state.body_part}**..."):
             try:
                 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-                prompt = f"""Generate exactly {num_facts} fascinating and accurate factoid(s) about the human {body_part}.
+                prompt = f"""Generate exactly {num_facts} fascinating and accurate factoid(s) about the human {st.session_state.body_part}.
 
 Each factoid should be:
 - Style (one per factoid): {', '.join(selected_styles)}
@@ -142,7 +145,7 @@ Do not add anything before or after the JSON array."""
                 if not factoids:
                     st.error("Could not parse response. Please try again.")
                 else:
-                    st.success(f"🧬 Here are your factoids about the **{body_part.title()}**!")
+                    st.success(f"🧬 Here are your factoids about the **{st.session_state.body_part.title()}**!")
                     for i, fact in enumerate(factoids, 1):
                         st.markdown(f'<div class="factoid-box">💡 <b>Fact #{i}:</b> {fact}</div>', unsafe_allow_html=True)
 
